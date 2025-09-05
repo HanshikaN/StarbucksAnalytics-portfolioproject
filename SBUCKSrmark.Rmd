@@ -1,0 +1,252 @@
+---
+title: "Starbucks Analytics"
+author: "Hanshika Nemala"
+date: "2025-09-05"
+output: html_document
+---
+
+# Starbucks Business & Sales Analytics
+
+## 1. Introduction
+This project analyzes Starbucks’ annual reports (2018–2024) and store counts (2022–2025) 
+to understand revenue drivers, profitability, and shareholder returns.
+
+## 2. Load Libraries
+```{r}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(openxlsx)
+library(janitor)
+library(gdata)
+```
+
+```{r}
+# Step 1: Read Excel, skip any top metadata rows (adjust skip if needed)
+storecount <- read_excel("data-raw/storecount.xlsx", skip = 4)
+
+# Step 2: Remove leading/trailing spaces from country names
+storecount <- storecount %>%
+  mutate(across(1, str_trim))
+
+# Step 3: Convert all count columns to numeric (remove commas or spaces)
+storecount <- storecount %>%
+  mutate(across(-1, ~ as.numeric(str_replace_all(., ",", ""))))
+
+# Step 4: Pivot wider columns (quarters) into long format
+storecount_long <- storecount %>%
+  pivot_longer(
+    cols = -1,
+    names_to = "quarter",
+    values_to = "store_count"
+  ) %>%
+  rename(country = 1)
+
+# Step 4: Filter labels out
+storecount_long <- storecount_long %>%
+  filter(!country %in% c("North America", "International"))
+
+
+# Step 6: Extract fiscal year and quarter number from column names
+storecount_long <- storecount_long %>%
+  mutate(
+    fiscal_year = str_extract(quarter, "FY\\d+"),
+    quarter_num = str_extract(quarter, "Q\\d+")
+  )
+
+# Step 7: Optional – reorder columns
+storecount_long <- storecount_long %>%
+  select(country, fiscal_year, quarter_num, store_count)
+
+# View cleaned table
+View(storecount_long)
+write.csv(storecount_long, "data-clean/store_count_clean.csv", row.names = FALSE)
+```
+
+```{r}
+annual18income <- read_excel("data-raw/annual18.xlsx", sheet = "INCOME_STATEMENT",
+  skip = 14  ) %>%
+  clean_names()
+annual19income <- read_excel("data-raw/annual19.xlsx", sheet = "INCOME_STATEMENT", 
+  skip = 14  ) %>%
+  clean_names()
+annual20income <- read_excel("data-raw/annual20.xlsx", sheet = "INCOME_STATEMENT", 
+  skip = 14  ) %>%
+  clean_names()
+annual21income <- read_excel("data-raw/annual21.xlsx", sheet = "INCOME_STATEMENT", 
+  skip = 14  ) %>%
+  clean_names()
+annual22income <- read_excel("data-raw/annual22.xlsx", sheet = "INCOME_STATEMENT", 
+  skip = 14  ) %>%
+  clean_names()
+annual23income <- read_excel("data-raw/annual23.xlsx", sheet = "INCOME_STATEMENT", 
+  skip = 14  ) %>%
+  clean_names()
+annual24income <- read_excel("data-raw/annual24.xlsx", sheet = "INCOME_STATEMENT", 
+  skip = 14  ) %>%
+  clean_names()
+#View(annual24income)
+```
+Define important items
+```{r}
+important_patterns <- c(
+  "Company-operated stores",
+  "Licensed stores",
+  "Other",
+  "Total net revenues",
+  "Store operating expenses",
+  "Other operating expenses",
+  "Depreciation and amortization expenses",
+  "General and administrative expenses",
+  "Total operating expenses",
+  "Operating income",
+  "Income from equity investees"
+)
+```
+
+cleaning the data 
+```{r}
+
+# -----------------------------
+# Clean FY2018 (annual18income)
+# -----------------------------
+annual18_clean <- annual18income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+num_cols <- 2:ncol(annual18_clean)
+annual18_clean[, num_cols] <- lapply(annual18_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+# -----------------------------
+# Clean FY2019 (annual19income)
+# -----------------------------
+annual19_clean <- annual19income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+
+num_cols <- 2:ncol(annual19_clean)
+annual19_clean[, num_cols] <- lapply(annual19_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+# -----------------------------
+# Clean FY2020 (annual20income)
+# -----------------------------
+annual20_clean <- annual20income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+
+num_cols <- 2:ncol(annual20_clean)
+annual20_clean[, num_cols] <- lapply(annual20_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+# -----------------------------
+# Clean FY2021 (annual21income)
+# -----------------------------
+annual21_clean <- annual21income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+
+num_cols <- 2:ncol(annual21_clean)
+annual21_clean[, num_cols] <- lapply(annual21_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+# -----------------------------
+# Clean FY2022 (annual22income)
+# -----------------------------
+annual22_clean <- annual22income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+
+num_cols <- 2:ncol(annual22_clean)
+annual21_clean[, num_cols] <- lapply(annual22_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+# -----------------------------
+# Clean FY2023 (annual23income)
+# -----------------------------
+annual23_clean <- annual23income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+
+num_cols <- 2:ncol(annual23_clean)
+annual21_clean[, num_cols] <- lapply(annual23_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+# -----------------------------
+# Clean FY2024 (annual24income)
+# -----------------------------
+annual24_clean <- annual24income %>%
+  mutate(fiscal_year_ended = str_trim(as.character(fiscal_year_ended))) %>%
+  filter(sapply(important_patterns, function(pat) str_detect(fiscal_year_ended, regex(pat, ignore_case = TRUE))) %>% apply(1, any))
+
+num_cols <- 2:ncol(annual24_clean)
+annual21_clean[, num_cols] <- lapply(annual24_clean[, num_cols], function(x) {
+  as.numeric(gsub("\\$|,|\\s|\\u00A0", "", as.character(x)))
+})
+
+#View(annual24_clean)
+```
+
+combine tables 
+```{r}
+# Step 1: Put all cleaned annual tables in a list
+annual_list <- list(
+  annual18_clean,
+  annual19_clean,
+  annual20_clean,
+  annual21_clean,
+  annual22_clean,
+  annual23_clean,
+  annual24_clean
+)
+
+# Step 2: Convert each table to long format
+annual_long <- lapply(annual_list, function(df) {
+  
+  # Save original column names for years
+  year_cols <- colnames(df)[-1]  # all except first column (line_item)
+  
+  # Remove any prefix like "x" that clean_names() might have added
+  year_cols_clean <- str_replace_all(year_cols, "^x", "")
+  
+  # Rename the year columns to clean names temporarily
+  colnames(df)[-1] <- year_cols_clean
+  
+  # Pivot longer
+  df_long <- df %>%
+    pivot_longer(
+      cols = -1,
+      names_to = "fiscal_year",
+      values_to = "value"
+    ) %>%
+    rename(line_item = 1)
+  
+  return(df_long)
+})
+
+# Step 3: Combine all years into one table
+combined_annual <- bind_rows(annual_long)
+
+# Step 4: Make sure fiscal_year is numeric
+combined_annual <- combined_annual %>%
+  mutate(fiscal_year = as.numeric(fiscal_year))
+
+# Step 5: Remove duplicates
+combined_annual_clean <- combined_annual %>%
+  distinct() %>%  # remove exact duplicate rows
+  group_by(line_item, fiscal_year) %>%
+  slice(1) %>%   # keep first occurrence if still duplicates
+  ungroup()
+
+# Step 6: View final combined table
+View(combined_annual_clean)
+write.csv(combined_annual_clean, "data-clean/clean_annual_final.csv", row.names = FALSE)
+```
