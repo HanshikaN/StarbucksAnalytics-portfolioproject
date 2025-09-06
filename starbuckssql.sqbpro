@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="/Users/hanshika/Desktop/starbucks project /starbuckssql.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="471"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="FYannual" custom_title="0" dock_id="1" table="4,8:mainFYannual"/><dock_state state="000000ff00000000fd00000001000000020000024a000002bbfc0100000001fb000000160064006f0063006b00420072006f007700730065003101000000000000024a0000011500ffffff0000024a0000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="FYannual" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="205"/><column index="2" value="80"/><column index="3" value="52"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1*">-----------------------------------------------------------------------
+-- Starbucks SQL Project: Questions 1 - 8 
+-- Cleaned queries ready to run in DB Browser
+-- Author: Hanshika Nemala
+-----------------------------------------------------------------------
+--Table of Contents
+-- Question 1: Top Revenue Segment Per Fiscal Year
+-- Question 2: Operating Margin Per Fiscal Year
+-- Question 3: Operating Expenses Relative to Total Revenue
+-- Question 4: Global Store Count Growth Per Year
+-- Question 5: Operating Margin Trends vs. Store Growth
+-- Question 6: Segment Contribution to Operating Efficiency
+-- Question 7: Segment Growth Relative to Overall Store Growth
+-- Question 8: Company-operated vs. Licensed Revenue Ratio Over Time
+
+-- ==========================================
+-- Question 1: Identify the top revenue segment per fiscal year
+-- Purpose: Determine whether Company-operated or Licensed stores generated the most revenue each year.
+-- Importance: Helps stakeholders quickly see which segment drives the majority of income, informing decisions about resource allocation, marketing focus, or store expansion priorities.
+-- Potential uses: Strategic planning for growth, prioritizing investment in high-revenue segments, and evaluating performance trends over time.
+-- SQL skills demonstrated: Conditional aggregation, SUM with CASE statements, grouping by fiscal year, calculated columns.
+-- ==========================================
+
+SELECT fiscal_year AS &quot;Fiscal Year&quot;,
+       SUM(CASE WHEN TRIM(main_variable) = 'Company-operated stores' THEN CAST(value AS REAL) ELSE 0 END) AS CompanyRevenue,
+       SUM(CASE WHEN TRIM(main_variable) = 'Licensed stores' THEN CAST(value AS REAL) ELSE 0 END) AS LicensedRevenue,
+       CASE 
+           WHEN SUM(CASE WHEN TRIM(main_variable) = 'Company-operated stores' THEN CAST(value AS REAL) ELSE 0 END)
+                &gt; SUM(CASE WHEN TRIM(main_variable) = 'Licensed stores' THEN CAST(value AS REAL) ELSE 0 END)
+           THEN 'Company-operated stores'
+           WHEN SUM(CASE WHEN TRIM(main_variable) = 'Company-operated stores' THEN CAST(value AS REAL) ELSE 0 END)
+                &lt; SUM(CASE WHEN TRIM(main_variable) = 'Licensed stores' THEN CAST(value AS REAL) ELSE 0 END)
+           THEN 'Licensed stores'
+           ELSE 'Tie'
+       END AS &quot;Top Segment&quot;
+FROM FYannual
+WHERE fiscal_year &gt; 0
+GROUP BY fiscal_year
+ORDER BY fiscal_year;
+
+-- ==========================================
+-- Question 2: Calculate operating margin per fiscal year
+-- Purpose: Measure the efficiency of converting revenue into profit by calculating Operating Income / Total Net Revenues.
+-- Importance: Highlights years of high profitability or operational stress, giving insights into operational efficiency.
+-- Potential uses: Benchmarking performance, identifying cost-control opportunities, guiding investor communication, or evaluating profitability trends over time.
+-- SQL skills demonstrated: Aggregation, SUM with CASE, arithmetic operations, calculated metrics, rounding, and grouping.
+-- ==========================================
+
+SELECT fiscal_year AS &quot;Fiscal Year&quot;,
+       SUM(CASE WHEN TRIM(main_variable) = 'Operating income' THEN CAST(value AS REAL) ELSE 0 END) AS OperatingIncome,
+       SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' THEN CAST(value AS REAL) ELSE 0 END) AS TotalRevenue,
+       ROUND(
+         SUM(CASE WHEN TRIM(main_variable) = 'Operating income' THEN CAST(value AS REAL) ELSE 0 END) * 100.0
+         / NULLIF(SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' THEN CAST(value AS REAL) ELSE 0 END),0),
+         2
+       ) AS OperatingMarginPercent
+FROM FYannual
+WHERE fiscal_year &gt; 0
+GROUP BY fiscal_year
+ORDER BY fiscal_year;
+
+-- ==========================================
+-- Question 3: Track operating expenses relative to total revenue
+-- Purpose: Analyze the proportion of operating expenses to revenue over time to assess efficiency.
+-- Importance: Helps understand if the company is becoming more or less efficient in managing its costs relative to income.
+-- Potential uses: Inform cost-reduction strategies, operational budgeting, and efficiency analysis.
+-- SQL skills demonstrated: Conditional aggregation, ratio calculations, grouping, and trend analysis over multiple fiscal years.
+-- ==========================================
+
+WITH ExpenseTrends AS (
+    SELECT CAST(fiscal_year AS INTEGER) AS FiscalYear,
+           SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' 
+                    THEN CAST(value AS REAL) ELSE 0 END) AS TotalRevenue,
+           SUM(CASE WHEN TRIM(main_variable) = 'Store operating expenses' 
+                    THEN CAST(value AS REAL) ELSE 0 END) AS StoreExpenses,
+           ROUND(
+             SUM(CASE WHEN TRIM(main_variable) = 'Store operating expenses' 
+                      THEN CAST(value AS REAL) ELSE 0 END) * 100.0
+             / NULLIF(SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' 
+                               THEN CAST(value AS REAL) ELSE 0 END), 0),
+             2
+           ) AS StoreExpensesPct
+    FROM FYannual
+    WHERE CAST(fiscal_year AS INTEGER) &gt; 0
+    GROUP BY CAST(fiscal_year AS INTEGER)
+)
+SELECT FiscalYear,
+       TotalRevenue,
+       StoreExpenses,
+       StoreExpensesPct,
+       ROUND(
+         StoreExpensesPct - LAG(StoreExpensesPct) OVER (ORDER BY FiscalYear),
+         2
+       ) AS YoY_ChangePct
+FROM ExpenseTrends
+ORDER BY FiscalYear;
+
+-- ==========================================
+-- Question 4: Global store count growth per year
+-- Purpose: Determine the total number of stores each year and calculate year-over-year growth rates.
+-- Importance: Provides insights into expansion trends, pace of growth, and market penetration over time.
+-- Potential uses: Forecasting future store growth, identifying expansion bottlenecks, or planning resource allocation.
+-- SQL skills demonstrated: Aggregation, SUM, grouping, LAG() for calculating YoY growth, ordering, and filtering.
+-- ==========================================
+
+WITH yearly_stores AS (
+    SELECT CAST(SUBSTR(year, 3) AS INTEGER) AS fiscal_year,   -- remove 'FY'
+           SUM(count) AS total_stores
+    FROM storecount
+    WHERE count IS NOT NULL
+      AND year NOT IN ('year','0')   -- filter header rows
+    GROUP BY CAST(SUBSTR(year, 3) AS INTEGER)
+)
+SELECT fiscal_year,
+       total_stores,
+       LAG(total_stores) OVER (ORDER BY fiscal_year) AS prev_year_stores,
+       ROUND(
+           (CAST(total_stores AS REAL) - LAG(total_stores) OVER (ORDER BY fiscal_year)) 
+           * 100.0 / NULLIF(LAG(total_stores) OVER (ORDER BY fiscal_year), 0),
+           2
+       ) AS YoY_Growth_Percent
+FROM yearly_stores
+ORDER BY fiscal_year;
+
+-- ==========================================
+-- Question 5: Compare operating margin trends with store growth
+-- Purpose: Examine how operating margin changes alongside store count increases.
+-- Importance: Reveals if expansion is sustainable; declining margins with increasing stores may indicate rising costs or overexpansion, while simultaneous improvement indicates efficient scalability.
+-- Potential uses: Strategic expansion planning, evaluating operational sustainability, and informing executive decision-making.
+-- SQL skills demonstrated: Joins between tables, calculated metrics, conditional aggregation, and combining multiple data sources.
+-- ==========================================
+
+WITH store_years AS (
+    SELECT CAST('20' || SUBSTR(year, 3) AS INTEGER) AS fiscal_year,
+           SUM(count) AS total_stores
+    FROM storecount
+    WHERE count IS NOT NULL
+      AND year NOT IN ('year','0')
+    GROUP BY CAST('20' || SUBSTR(year, 3) AS INTEGER)
+),
+margins AS (
+    SELECT fiscal_year,
+           SUM(CASE WHEN TRIM(main_variable) = 'Operating income' THEN CAST(value AS REAL) ELSE 0 END) AS operating_income,
+           SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' THEN CAST(value AS REAL) ELSE 0 END) AS total_revenue,
+           ROUND(
+             SUM(CASE WHEN TRIM(main_variable) = 'Operating income' THEN CAST(value AS REAL) ELSE 0 END) * 100.0
+             / NULLIF(SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' THEN CAST(value AS REAL) ELSE 0 END),0),
+             2
+           ) AS operating_margin_percent
+    FROM FYannual
+    GROUP BY fiscal_year
+)
+SELECT m.fiscal_year,
+       m.total_revenue,
+       s.total_stores,
+       m.operating_margin_percent,
+       ROUND(m.total_revenue / NULLIF(s.total_stores, 0), 2) AS revenue_per_store
+FROM margins m
+JOIN store_years s
+  ON m.fiscal_year = s.fiscal_year
+ORDER BY m.fiscal_year;
+
+-- ==========================================
+-- Question 6: Segment contribution to operating efficiency
+-- Purpose: Identify which store segment (Company-operated vs. Licensed) contributes most to operating efficiency over time, and relate it to global store expansion.
+-- Importance: Shows how each segment drives profitability per store, providing insight into operational performance and segment-level efficiency.
+-- Potential uses: Strategic decisions about segment expansion, investment prioritization, and profitability analysis.
+-- SQL skills demonstrated: Multi-table joins, conditional aggregation, complex calculations, and combining revenue, margin, and store data.
+-- ==========================================
+
+WITH store_years AS (
+    SELECT CAST('20' || SUBSTR(year, 3) AS INTEGER) AS fiscal_year,
+           SUM(count) AS total_stores
+    FROM storecount
+    WHERE count IS NOT NULL
+      AND year NOT IN ('year','0')
+    GROUP BY CAST('20' || SUBSTR(year, 3) AS INTEGER)
+),
+segment_revenue AS (
+    SELECT fiscal_year,
+           SUM(CASE WHEN TRIM(main_variable) = 'Company-operated stores' THEN CAST(value AS REAL) ELSE 0 END) AS company_revenue,
+           SUM(CASE WHEN TRIM(main_variable) = 'Licensed stores' THEN CAST(value AS REAL) ELSE 0 END) AS licensed_revenue,
+           SUM(CASE WHEN TRIM(main_variable) = 'Operating income' THEN CAST(value AS REAL) ELSE 0 END) AS operating_income,
+           SUM(CASE WHEN TRIM(main_variable) = 'Total net revenues' THEN CAST(value AS REAL) ELSE 0 END) AS total_revenue
+    FROM FYannual
+    GROUP BY fiscal_year
+)
+SELECT s.fiscal_year,
+       s.total_stores,
+       sr.total_revenue,
+       sr.operating_income,
+       sr.company_revenue,
+       sr.licensed_revenue,
+       ROUND(sr.operating_income / NULLIF(sr.total_revenue,0) * 100,2) AS operating_margin_percent,
+       ROUND(sr.company_revenue / NULLIF(s.total_stores,0),2) AS revenue_per_store_company,
+       ROUND(sr.licensed_revenue / NULLIF(s.total_stores,0),2) AS revenue_per_store_licensed,
+       CASE 
+           WHEN sr.company_revenue &gt; sr.licensed_revenue THEN 'Company-operated'
+           WHEN sr.company_revenue &lt; sr.licensed_revenue THEN 'Licensed'
+           ELSE 'Tie'
+       END AS top_segment
+FROM store_years s
+JOIN segment_revenue sr
+  ON s.fiscal_year = sr.fiscal_year
+ORDER BY s.fiscal_year;
+
+-- ==========================================
+-- Question 7: Segment growth relative to overall store growth
+-- Purpose: Determine if Company-operated or Licensed stores are growing faster than the total store count.
+-- Importance: Helps identify which segment drives expansion and flags potential concentration risk if growth is uneven.
+-- Potential uses: Expansion planning, risk management, and evaluating segment-level growth strategies.
+-- SQL skills demonstrated: Conditional aggregation, window functions (LAG/LEAD), calculated metrics, and trend analysis.
+-- ==========================================
+
+WITH segment_stores AS (
+    SELECT fiscal_year,
+           SUM(CASE WHEN TRIM(main_variable) = 'Company-operated stores' THEN CAST(value AS REAL) ELSE 0 END) AS company_revenue,
+           SUM(CASE WHEN TRIM(main_variable) = 'Licensed stores' THEN CAST(value AS REAL) ELSE 0 END) AS licensed_revenue,
+           SUM(CASE WHEN TRIM(main_variable) IN ('Company-operated stores', 'Licensed stores') THEN CAST(value AS REAL) ELSE 0 END) AS total_segment_revenue
+    FROM FYannual
+    GROUP BY fiscal_year
+),
+store_growth AS (
+    SELECT CAST('20' || SUBSTR(year, 3) AS INTEGER) AS fiscal_year,
+           SUM(count) AS total_stores
+    FROM storecount
+    WHERE count IS NOT NULL
+      AND year NOT IN ('year','0')
+    GROUP BY CAST('20' || SUBSTR(year, 3) AS INTEGER)
+)
+SELECT sg.fiscal_year,
+       sg.total_stores,
+       ss.company_revenue,
+       ss.licensed_revenue,
+       ROUND(LAG(ss.company_revenue) OVER (ORDER BY sg.fiscal_year), 2) AS prev_company_revenue,
+       ROUND(LAG(ss.licensed_revenue) OVER (ORDER BY sg.fiscal_year), 2) AS prev_licensed_revenue,
+       ROUND(
+           (ss.company_revenue - LAG(ss.company_revenue) OVER (ORDER BY sg.fiscal_year)) 
+           * 100.0 / NULLIF(LAG(ss.company_revenue) OVER (ORDER BY sg.fiscal_year),0), 2
+       ) AS YoY_Growth_Company,
+       ROUND(
+           (ss.licensed_revenue - LAG(ss.licensed_revenue) OVER (ORDER BY sg.fiscal_year)) 
+           * 100.0 / NULLIF(LAG(ss.licensed_revenue) OVER (ORDER BY sg.fiscal_year),0), 2
+       ) AS YoY_Growth_Licensed
+FROM store_growth sg
+JOIN segment_stores ss
+  ON sg.fiscal_year = ss.fiscal_year
+ORDER BY sg.fiscal_year;
+
+-- ==========================================
+-- Question 8: Track Company-operated vs. Licensed revenue ratio over time
+-- Purpose: Analyze how the revenue proportion of each segment changes year-over-year.
+-- Importance: Highlights shifts in business model reliance and identifies if the company is increasingly dependent on one segment.
+-- Potential uses: Strategic planning, evaluating segment mix, investor reporting, and assessing scalability and risk.
+-- SQL skills demonstrated: Ratio calculations, conditional aggregation, grouping, calculated metrics, and trend analysis.
+-- ==========================================
+
+WITH segment_revenue AS (
+    SELECT fiscal_year,
+           SUM(CASE WHEN TRIM(main_variable) = 'Company-operated stores' THEN CAST(value AS REAL) ELSE 0 END) AS company_revenue,
+           SUM(CASE WHEN TRIM(main_variable) = 'Licensed stores' THEN CAST(value AS REAL) ELSE 0 END) AS licensed_revenue,
+           SUM(CASE WHEN TRIM(main_variable) IN ('Company-operated stores','Licensed stores') THEN CAST(value AS REAL) ELSE 0 END) AS total_segment_revenue
+    FROM FYannual
+    GROUP BY fiscal_year
+)
+SELECT fiscal_year,
+       company_revenue,
+       licensed_revenue,
+       total_segment_revenue,
+       ROUND(company_revenue * 100.0 / NULLIF(total_segment_revenue,0),2) AS company_ratio_percent,
+       ROUND(licensed_revenue * 100.0 / NULLIF(total_segment_revenue,0),2) AS licensed_ratio_percent
+FROM segment_revenue
+ORDER BY fiscal_year;
+
+</sql><current_tab id="0"/></tab_sql></sqlb_project>
